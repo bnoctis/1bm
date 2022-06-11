@@ -1,0 +1,124 @@
+= 1bm: single binary manager
+
+image:https://img.shields.io/crates/v/onebm?style=flat-square[Crates.io,link=https://crates.io/crates/onebm]
+
+1bm is a single (*1*) **b**inary application **m**anager.
+It installs, updates, uninstalls single binary applications (SBAs),
+just like a package manager would do to packages.
+
+Due to limitations of Cargo, the crate is named onebm.
+
+== Install and use
+
+.install
+----
+$ mkdir -p ~/.local/1bm/bin
+$ curl -O ~/.local/1bm/bin/1bm -sSL https://github.com/1bm/1bm/releases/latest/download/1bm-{linux,macos,windows.exe}
+$ echo 'export PATH="$HOME/.local/1bm/bin:$PATH"' >> ~/.config/fish/config.fish; source ~/.config/fish/config.fish
+$ 1bm i https://github.com/1bm/1bm/raw/master/1bm.1bmdist
+----
+
+An installer is intentionally not provided
+because literally four lines won't cost you much time.
+
+The download links are redirected to GitHub releases.
+You can as well download them from there manually.
+
+.use
+----
+# download dist file and install application with default binary name
+$ 1bm i https://github.com/some/app/raw/master/app.1bmdist
+# install application with custom binary name (also local identifier)
+$ 1bm i -n someapp https://github.com/some/app/raw/master/app.1bmdist
+# list binaries intalled through 1bm
+$ 1bm ls
+# update all installed applications
+$ 1bm up
+# update specified applications
+$ 1bm up 1bm someapp
+# uninstall applications
+$ 1bm rm someapp
+----
+
+That's it. 1bm doesn't attempt to do more than that.
+
+.uninstall 1bm
+----
+$ rm -rf ~/.local/1bm
+# Then remove the PATH line from your shell startup script. I don't know a one-liner to do that.
+----
+
+For developers generating dist files and signatures,
+please refer to <<Dist files and signatures>>.
+
+== Why?
+
+Nowadays, many CLI applications are built in a way so that they're delivered as a single binary,
+without depending on shared libraries.
+Also notably, AppImage is an attempt at doing so for GUI applications.
+
+Using a full-blown software package manager,
+packages are often managed by people other than application authors,
+resulting in outdated versions or even abandoned packages.
+
+How about using the package manager of the programming language the application is written in?
+First, language package managers, despite being called "package managers" just like software
+package managers, are used to manage source code packages (libraries), not binaries;
+second, the user has to install an additional piece of software they may otherwise make no use of.
+
+Many authors now utilize public CI/CD services to deliver their applications;
+it's often trivial to download the binaries from such services.
+
+Thus, it's reasonable to have an "application manager" for SBAs.
+
+== How?
+
+- SBA author signs their binaries,
+and distributes an 1bm dist(ribution) file (JSON, ending with ".1bmdist"), which contains metadata
+like the signing key, default binary name, and where to download the newest binary.
+- To install an application, you feed the dist file to 1bm,
+which then downloads the binary, verifies it with the key, and puts it into its binary store.
+- On upgrading an application, 1bm goes over the download - verify - store process.
+- On uninstalling, the installed binary is simply deleted. (actually there's a little bit bookkeeping)
+- If the "update URL" is 404, 1bm tells the user they should check for a new dist file.
+
+== Security?
+
+Indeed, running pre-built binaries poses some security concerns.
+But unless you are hardcore enough to audit and build yourself all - I mean ALL - software you use,
+including the operating system, you are running things you don't 100% know.
+
+It's always about trust. And you already trust the application author,
+or you won't use what they built in the first place.
+
+Plus, the binaries are signed.
+
+== Dist files and signatures
+
+Dist files are JSON files with an ".1bmdist" extension. Fields of the JSON:
+
+* *signing_key* `string` Signing public key.
+* *binary_name* `string` Default binary name.
+* *download_url* `string` Different depending on *download_type*, see below.
+* *download_type* `string`
+** `ghr` Download through GitHub releases, always the latest release.
+Has following additional fields (on top level).
+The `github_asset_regex_*` fields may be omitted if no binary is built for certain platform.
+*** *download_url* `string` GitHub repo slug, e.g. `bnoctis/1bm`.
+*** *github_asset_regex_linux* `string` regular expression to match asset name for Linux.
+*** *github_asset_regex_macos* `string` regular expression to match asset name for macOS.
+*** *github_asset_regex_windows* `string` regular expression to match asset name for Windows.
+** `url` Direct URL download, no version check.
+*** *download_url* `string` Download URL.
+
+Signatures are generated with https://github.com/jedisct1/minisign[minisign].
+*signing_key* above is the public key.
+
+Signatures are expected to be placed alongside the binary,
+named `SIGNED_FILE.minisig`, e.g. `1bm.minisig` if the binary is `1bm`,
+which is the default behavior of minisign.
+
+== License
+
+BSD 3-clause &copy; Blair Noctis.
+
